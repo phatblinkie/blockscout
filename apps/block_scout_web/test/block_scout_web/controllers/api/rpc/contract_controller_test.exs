@@ -1,6 +1,117 @@
 defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
   use BlockScoutWeb.ConnCase
 
+  describe "listcontracts" do
+    setup do
+      %{params: %{"module" => "contract", "action" => "listcontracts"}}
+    end
+
+    test "with no contracts", %{conn: conn, params: params} do
+      response =
+        conn
+        |> get("/api", params)
+        |> json_response(200)
+
+      assert response["message"] == "OK"
+      assert response["status"] == "1"
+      assert response["result"] == []
+    end
+
+    test "with a verified smart contract, all contract information is shown", %{conn: conn, params: params} do
+      contract = insert(:smart_contract)
+
+      response =
+        conn
+        |> get("/api", params)
+        |> json_response(200)
+
+      assert response["message"] == "OK"
+      assert response["status"] == "1"
+
+      assert response["result"] == [
+               %{
+                 "ABI" => Jason.encode!(contract.abi),
+                 "Address" => to_string(contract.address_hash),
+                 "CompilerVersion" => contract.compiler_version,
+                 "ContractName" => contract.name,
+                 "OptimizationUsed" => if(contract.optimization, do: "1", else: "0"),
+                 "SourceCode" => contract.contract_source_code
+               }
+             ]
+    end
+
+    test "with an unverified contract address, only basic information is shown", %{conn: conn, params: params} do
+      address = insert(:contract_address)
+
+      response =
+        conn
+        |> get("/api", params)
+        |> json_response(200)
+
+      assert response["message"] == "OK"
+      assert response["status"] == "1"
+
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(address.hash),
+                 "CompilerVersion" => "",
+                 "ContractName" => "",
+                 "OptimizationUsed" => "",
+                 "SourceCode" => ""
+               }
+             ]
+    end
+
+    test "filtering for only unverified contracts shows only unverified contracts", %{params: params, conn: conn} do
+      address = insert(:contract_address)
+      insert(:smart_contract)
+
+      response =
+        conn
+        |> get("/api", Map.put(params, "filter", "unverified"))
+        |> json_response(200)
+
+      assert response["message"] == "OK"
+      assert response["status"] == "1"
+
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(address.hash),
+                 "CompilerVersion" => "",
+                 "ContractName" => "",
+                 "OptimizationUsed" => "",
+                 "SourceCode" => ""
+               }
+             ]
+    end
+
+    test "filtering for only verified contracts shows only verified contracts", %{params: params, conn: conn} do
+      insert(:contract_address)
+      contract = insert(:smart_contract)
+
+      response =
+        conn
+        |> get("/api", Map.put(params, "filter", "verified"))
+        |> json_response(200)
+
+      assert response["message"] == "OK"
+      assert response["status"] == "1"
+
+      assert response["result"] == [
+               %{
+                 "ABI" => Jason.encode!(contract.abi),
+                 "Address" => to_string(contract.address_hash),
+                 "CompilerVersion" => contract.compiler_version,
+                 "ContractName" => contract.name,
+                 "OptimizationUsed" => if(contract.optimization, do: "1", else: "0"),
+                 "SourceCode" => contract.contract_source_code
+               }
+             ]
+    end
+  end
+
   describe "getabi" do
     test "with missing address hash", %{conn: conn} do
       params = %{
@@ -119,6 +230,7 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
 
       expected_result = [
         %{
+          "Address" => "",
           "SourceCode" => "",
           "ABI" => "Contract source code not verified",
           "ContractName" => "",
@@ -148,6 +260,7 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
 
       expected_result = [
         %{
+          "Address" => to_string(contract.address_hash),
           "SourceCode" => contract.contract_source_code,
           "ABI" => Jason.encode!(contract.abi),
           "ContractName" => contract.name,

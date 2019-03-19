@@ -276,6 +276,16 @@ defmodule BlockScoutWeb.Etherscan do
     "result" => nil
   }
 
+  @contract_listcontracts_example_value %{
+    "status" => "1",
+    "message" => "OK",
+    "result" => [
+      %{
+        "address" => "0x0000000000000000000000000000000000000000"
+      }
+    ]
+  }
+
   @contract_getabi_example_value %{
     "status" => "1",
     "message" => "OK",
@@ -742,6 +752,7 @@ defmodule BlockScoutWeb.Etherscan do
   @contract_model %{
     name: "Contract",
     fields: %{
+      "Address" => @address_hash_type,
       "SourceCode" => %{
         type: "contract source code",
         definition: "The contract's source code.",
@@ -1635,6 +1646,55 @@ defmodule BlockScoutWeb.Etherscan do
     ]
   }
 
+  @contract_listcontracts_action %{
+    name: "listcontracts",
+    description: "Get a list of contracts, sorted ascending by the time they were first seen by the explorer.",
+    required_params: [],
+    optional_params: [
+      %{
+        key: "page",
+        type: "integer",
+        description:
+          "A nonnegative integer that represents the page number to be used for pagination. 'offset' must be provided in conjunction."
+      },
+      %{
+        key: "offset",
+        type: "integer",
+        description:
+          "A nonnegative integer that represents the maximum number of records to return when paginating. 'page' must be provided in conjunction."
+      },
+      %{
+        key: "filter",
+        type: "string",
+        description:
+          "verified|decompiled|unverified|not_decompiled, or 1|2|3|4 respectively. This requests only contracts with that status."
+      }
+    ],
+    responses: [
+      %{
+        code: "200",
+        description: "successful operation",
+        example_value: Jason.encode!(@contract_listcontracts_example_value),
+        model: %{
+          name: "Result",
+          fields: %{
+            status: @status_type,
+            message: @message_type,
+            result: %{
+              type: "array",
+              array_type: @contract_model
+            }
+          }
+        }
+      },
+      %{
+        code: "200",
+        description: "error",
+        example_value: Jason.encode!(@account_getminedblocks_example_value_error)
+      }
+    ]
+  }
+
   @contract_getabi_action %{
     name: "getabi",
     description: "Get ABI for verified contract. Also available through a GraphQL 'addresses' query.",
@@ -1862,6 +1922,7 @@ defmodule BlockScoutWeb.Etherscan do
   @contract_module %{
     name: "contract",
     actions: [
+      @contract_listcontracts_action,
       @contract_getabi_action,
       @contract_getsourcecode_action
     ]

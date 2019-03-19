@@ -2603,6 +2603,55 @@ defmodule Explorer.Chain do
     Repo.all(query, timeout: :infinity)
   end
 
+  def list_verified_contracts(limit, offset) do
+    query =
+      from(
+        contract in SmartContract,
+        order_by: [asc: contract.inserted_at],
+        limit: ^limit,
+        offset: ^offset
+      )
+
+    Repo.all(query)
+  end
+
+  def list_contracts(limit, offset) do
+    query =
+      from(
+        address in Address,
+        where: not is_nil(address.contract_code),
+        left_join: smart_contract in SmartContract,
+        on: smart_contract.address_hash == address.hash,
+        order_by: [asc: address.inserted_at],
+        limit: ^limit,
+        offset: ^offset,
+        # Left join to decoded smart contracts here to include
+        # them in the list.
+        select: {smart_contract, address}
+      )
+
+    query
+    |> Repo.all()
+    |> Enum.map(fn {smart_contract, address} ->
+      smart_contract || address
+    end)
+  end
+
+  def list_unverified_contracts(limit, offset) do
+    query =
+      from(
+        address in Address,
+        left_join: smart_contract in SmartContract,
+        on: smart_contract.address_hash == address.hash,
+        where: is_nil(smart_contract.address_hash),
+        order_by: [asc: address.inserted_at],
+        limit: ^limit,
+        offset: ^offset
+      )
+
+    Repo.all(query)
+  end
+
   @doc """
   Combined block reward from all the fees.
   """
